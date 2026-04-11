@@ -109,7 +109,7 @@ let segmenter: bodySegmentation.BodySegmenter | null = null;
 let cameraOn = false;
 let rafId = 0;
 let vfcHandle = 0;
-let hiddenIntervalId = 0;
+let _recovering = false;
 
 /** Loaded from the file picker; drawn behind the segmented person. */
 let backgroundImage: HTMLImageElement | null = null;
@@ -207,6 +207,68 @@ loadModel().catch((err: unknown) => {
     true,
   );
 });
+
+/**
+ * Test whether the TF.js WebGL backend is still functional. Returns false if the
+ * GPU context was lost (e.g. after a window minimize on Windows).
+ */
+function isWebGLAlive(): boolean {
+  try {
+    const t = tf.tensor1d([1]);
+    t.dataSync();
+    t.dispose();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rebuild the TF.js WebGL backend and segmenter from scratch after a GPU context
+ * loss. The camera MediaStream survives minimize — only the GPU dies.
+ */
+async function recoverWebGLContext(): Promise<boolean> {
+  if (_recovering) return false;
+  _recovering = true;
+  setStatus("Recovering GPU context…");
+  try {
+    if (segmenter) {
+      try { segmenter.dispose(); } catch { /* may already be gone */ }
+      segmenter = null;
+    }
+
+    try { tf.engine().reset(); } catch { /* best-effort */ }
+    await tf.setBackend("webgl");
+    await tf.ready();
+
+    segmenter = await bodySegmentation.createSegmenter(
+      bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation,
+      {
+        runtime: "mediapipe",
+        modelType: "landscape",
+        solutionPath: MEDIAPIPE_SELFIE_URL,
+      },
+    );
+
+    if (video && video.readyState >= 2) {
+      try {
+        await segmenter.segmentPeople(video, { flipHorizontal: false });
+      } catch { /* warm-up best-effort */ }
+    }
+
+    setStatus("Running — recovered from GPU context loss.");
+    _recovering = false;
+    return true;
+  } catch (err) {
+    console.error("WebGL recovery failed:", err);
+    setStatus(
+      `Recovery failed: ${err instanceof Error ? err.message : String(err)}`,
+      true,
+    );
+    _recovering = false;
+    return false;
+  }
+}
 
 function resizeCanvases(w: number, h: number) {
   output.width = w;
@@ -464,103 +526,80 @@ async function processFrame() {
 }
 
 /**
- * Frame loop.
+ * Frame loop with automatic WebGL recovery.
  *
- * When the page is visible we use requestVideoFrameCallback / rAF so frames stay
- * in sync with the display. Both APIs freeze when the window is minimised, so we
- * fall back to a plain setInterval (~30 fps) while hidden — the segmentation and
- * canvas output keep running uninterrupted for OBS Window Capture.
+ * Visible  → rVFC / rAF (display-sync, smooth preview).
+ * Hidden   → loop pauses (on Windows, minimize kills the GPU context anyway).
+ * Restored → detects context loss, rebuilds TF.js + segmenter, resumes.
  */
 function scheduleFrameLoop() {
-  if (!cameraOn || !video) {
-    return;
-  }
+  if (!cameraOn || !video) return;
 
   const v = video;
+  let consecutiveErrors = 0;
 
-  const runOnce = async () => {
-    if (!cameraOn || !v) return;
-    try {
-      await processFrame();
-    } catch (e) {
-      console.error(e);
-      setStatus(
-        `Processing error: ${e instanceof Error ? e.message : String(e)}`,
-        true,
-      );
-    }
-  };
-
-  /* ── hidden: drive the loop with setInterval so rAF/rVFC pausing doesn't matter ── */
-  function startHiddenLoop() {
-    stopVisibleLoop();
-    if (hiddenIntervalId) return;
-    hiddenIntervalId = window.setInterval(() => {
-      if (!cameraOn) {
-        stopHiddenLoop();
-        return;
-      }
-      void runOnce();
-    }, 1000 / 30);
-  }
-
-  function stopHiddenLoop() {
-    if (hiddenIntervalId) {
-      clearInterval(hiddenIntervalId);
-      hiddenIntervalId = 0;
-    }
-  }
-
-  /* ── visible: use rVFC or rAF for display-sync rendering ── */
-  function stopVisibleLoop() {
+  function stopLoop() {
     if (v.cancelVideoFrameCallback && vfcHandle) {
       v.cancelVideoFrameCallback(vfcHandle);
       vfcHandle = 0;
     }
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = 0;
-    }
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
   }
 
-  const visibleLoop = async () => {
+  const loop = async () => {
     if (!cameraOn || !v) return;
-    await runOnce();
-    if (!cameraOn || !video) return;
-    if (document.hidden) {
-      /* page became hidden mid-frame: hand off to interval */
-      startHiddenLoop();
-      return;
+
+    if (v.paused) {
+      try { await v.play(); } catch { /* ignore */ }
     }
+
+    try {
+      await processFrame();
+      consecutiveErrors = 0;
+    } catch {
+      consecutiveErrors++;
+      if (consecutiveErrors >= 3 && !_recovering) {
+        const ok = await recoverWebGLContext();
+        if (ok) consecutiveErrors = 0;
+      }
+    }
+
+    if (!cameraOn || !video) return;
     if (typeof v.requestVideoFrameCallback === "function") {
-      vfcHandle = v.requestVideoFrameCallback(() => void visibleLoop());
+      vfcHandle = v.requestVideoFrameCallback(() => void loop());
     } else {
-      rafId = requestAnimationFrame(() => void visibleLoop());
+      rafId = requestAnimationFrame(() => void loop());
     }
   };
 
-  /* ── react to minimise / restore ── */
-  const onVisibilityChange = () => {
-    if (!cameraOn) return;
-    if (document.hidden) {
-      stopVisibleLoop();
-      startHiddenLoop();
-    } else {
-      stopHiddenLoop();
-      void visibleLoop();
+  const onVisibilityChange = async () => {
+    if (!cameraOn || !v) return;
+
+    if (!document.hidden) {
+      // Window restored — ensure the video is playing
+      if (v.paused) {
+        try { await v.play(); } catch { /* ignore */ }
+      }
+
+      // Check if the WebGL context survived the minimize
+      if (!isWebGLAlive()) {
+        await recoverWebGLContext();
+      }
+
+      // Restart the visible frame loop
+      stopLoop();
+      void loop();
     }
   };
 
   document.removeEventListener("visibilitychange", onVisibilityChange);
   document.addEventListener("visibilitychange", onVisibilityChange);
 
-  /* ── kick off ── */
-  if (document.hidden) {
-    startHiddenLoop();
-  } else if (typeof v.requestVideoFrameCallback === "function") {
-    vfcHandle = v.requestVideoFrameCallback(() => void visibleLoop());
+  stopLoop();
+  if (typeof v.requestVideoFrameCallback === "function") {
+    vfcHandle = v.requestVideoFrameCallback(() => void loop());
   } else {
-    rafId = requestAnimationFrame(() => void visibleLoop());
+    rafId = requestAnimationFrame(() => void loop());
   }
 }
 
@@ -573,10 +612,6 @@ function stopCamera() {
   }
   cancelAnimationFrame(rafId);
   rafId = 0;
-  if (hiddenIntervalId) {
-    clearInterval(hiddenIntervalId);
-    hiddenIntervalId = 0;
-  }
 
   if (stream) {
     for (const t of stream.getTracks()) {
