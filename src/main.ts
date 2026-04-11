@@ -73,48 +73,6 @@ app.innerHTML = `
       </label>
       <p class="status" id="status">Loading AI model…</p>
       <p class="hint">Uses a 960×540 camera feed for smoother processing. Allow camera when prompted.</p>
-      <details class="meeting-panel" id="meeting-panel">
-        <summary>Using this as your meeting camera (Zoom / Teams / Meet)</summary>
-        <div class="meeting-body">
-          <p class="meeting-lead meeting-important">
-            <strong>Why this app cannot be a camera by itself:</strong> Browsers and Electron (JavaScript)
-            are not allowed to install a webcam driver. Showing video on screen is not the same as
-            registering a <em>capture device</em> that Teams or Zoom can select. A
-            <strong>native Windows component</strong> (Media Foundation or DirectShow) is required.
-          </p>
-          <p class="meeting-subhead">Standalone options (no OBS)</p>
-          <ul class="meeting-bullets">
-            <li>
-              <a href="https://www.nvidia.com/en-us/geforce/broadcasting/broadcast-app/" target="_blank" rel="noopener noreferrer">NVIDIA Broadcast</a>
-              (RTX GPUs): its own virtual camera + effects — unrelated to this app, but truly standalone.
-            </li>
-            <li>
-              Other commercial virtual-webcam tools (e.g. ManyCam) expose a system camera without using OBS.
-            </li>
-            <li>
-              <strong>Reference:</strong> Microsoft’s
-              <a href="https://learn.microsoft.com/en-us/windows/win32/api/mfvirtualcamera/nn-mfvirtualcamera-imfvirtualcamera" target="_blank" rel="noopener noreferrer">virtual camera APIs</a>
-              (<code class="meeting-code">MFCreateVirtualCamera</code>) — used by third-party virtual-camera samples and drivers.
-            </li>
-          </ul>
-          <p class="meeting-subhead">Free bridge many teams use: OBS Virtual Camera</p>
-          <p class="meeting-lead">
-            OBS is not the only option, but it is free and exposes <strong>OBS Virtual Camera</strong> as a normal
-            system device. You only need Window Capture + Start Virtual Camera — no streaming required.
-          </p>
-          <ol class="meeting-steps">
-            <li>Install <a href="https://obsproject.com/" target="_blank" rel="noopener noreferrer">OBS Studio</a>.</li>
-            <li>Run this app (<code class="meeting-code">npm run desktop:dev</code>) or the browser.</li>
-            <li>OBS → <strong>Window Capture</strong> (this window) or <strong>Browser</strong> → <code class="meeting-code">http://127.0.0.1:5173</code>.</li>
-            <li><strong>Start Virtual Camera</strong> in OBS.</li>
-            <li>In the meeting app → camera → <strong>OBS Virtual Camera</strong>.</li>
-          </ol>
-          <p class="meeting-tip">
-            For OBS: use <strong>Fill window</strong> on the preview (hides controls, uses the full window), then Window Capture. Hover the preview or press <strong>Escape</strong> to show controls again. Or use browser <strong>fullscreen</strong> below.
-          </p>
-          <button type="button" class="ghost" id="fullscreen-btn">Enter fullscreen</button>
-        </div>
-      </details>
     </div>
   </div>
 `;
@@ -631,13 +589,12 @@ toggleCam.addEventListener("click", async () => {
   scheduleFrameLoop();
 });
 
-const fullscreenBtn = document.querySelector<HTMLButtonElement>("#fullscreen-btn")!;
 const appSub = document.querySelector<HTMLParagraphElement>("#app-sub")!;
 const previewObsToggle = document.querySelector<HTMLButtonElement>("#preview-obs-toggle")!;
 
 if (navigator.userAgent.includes("Electron")) {
   appSub.textContent =
-    "Desktop app — use OBS Virtual Camera (see meeting section below) for Zoom / Teams / Meet.";
+    "Desktop app — same processing as the browser, packaged with Electron.";
 }
 
 function setCleanPreview(on: boolean) {
@@ -656,24 +613,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && app.classList.contains("clean-preview")) {
     setCleanPreview(false);
   }
-});
-
-fullscreenBtn.addEventListener("click", async () => {
-  try {
-    if (!document.fullscreenElement) {
-      await document.documentElement.requestFullscreen();
-    } else {
-      await document.exitFullscreen();
-    }
-  } catch {
-    /* Fullscreen may be blocked in some embedded contexts. */
-  }
-});
-
-document.addEventListener("fullscreenchange", () => {
-  fullscreenBtn.textContent = document.fullscreenElement
-    ? "Exit fullscreen"
-    : "Enter fullscreen";
 });
 
 window.addEventListener("beforeunload", () => {
