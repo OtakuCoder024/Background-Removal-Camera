@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { app, BrowserWindow, Tray, Menu, nativeImage, screen } = require("electron");
+const { registerAkvcamIpc } = require("./akvcam.cjs");
 
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
@@ -168,6 +169,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    registerAkvcamIpc();
     createTray();
     createWindow();
     app.on("activate", () => {

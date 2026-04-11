@@ -36,8 +36,9 @@
     "desktop:dev": "cross-env ELECTRON_DEV=1 concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "desktop:start": "npm run build && npm run icons && cross-env ELECTRON_DEV=0 electron .",
     "icons": "node scripts/generate-windows-icon.cjs",
-    "dist": "npm run build && npm run icons && electron-builder --win && node scripts/patch-icons.cjs",
-    "dist:dir": "npm run build && npm run icons && electron-builder --win --dir"
+    "akvcam:fetch": "powershell -ExecutionPolicy Bypass -File scripts/fetch-akvcam.ps1",
+    "dist": "npm run build && npm run icons && npm run akvcam:fetch && electron-builder --win && node scripts/patch-icons.cjs",
+    "dist:dir": "npm run build && npm run icons && npm run akvcam:fetch && electron-builder --win --dir"
   },
   "dependencies": {
     "@tensorflow-models/body-segmentation": "^1.0.2",
@@ -76,6 +77,13 @@
       {
         "from": "electron/window-icon.png",
         "to": "window-icon.png"
+      },
+      {
+        "from": "build/akvcam",
+        "to": "akvcam",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

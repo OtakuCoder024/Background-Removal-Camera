@@ -1,0 +1,6 @@
+AKVirtualCamera is licensed under GNU General Public License v3.0.
+Full license text: https://www.gnu.org/licenses/gpl-3.0.html
+Source code: https://github.com/webcamoid/akvirtualcamera/tree/9.4.0
+
+Bundled binary: akvirtualcamera-windows-9.4.0.exe (installer)
+After installation, AkVCamManager.exe is placed under <installPath>\x64\ or \x86\

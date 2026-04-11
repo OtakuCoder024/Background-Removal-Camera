@@ -71,6 +71,15 @@ app.innerHTML = `
         <input type="checkbox" id="mirror" checked />
         <span>Mirror preview (keep on for front camera)</span>
       </label>
+      <div class="akvcam-panel hidden" id="akvcam-panel">
+        <h3 class="akvcam-heading">System camera (Windows)</h3>
+        <label class="toggle">
+          <input type="checkbox" id="akvcam-virtual" disabled />
+          <span>Stream processed output to AKVirtualCamera</span>
+        </label>
+        <p class="hint akvcam-hint" id="akvcam-status">Checking AKVirtualCamera…</p>
+        <button type="button" class="ghost" id="akvcam-install">Install / update AKVirtualCamera…</button>
+      </div>
       <p class="status" id="status">Loading AI model…</p>
       <p class="hint">Uses a 960×540 camera feed for smoother processing. Allow camera when prompted.</p>
     </div>
@@ -102,6 +111,14 @@ const mirrorInput = document.querySelector<HTMLInputElement>("#mirror")!;
 const sensitivityInput = document.querySelector<HTMLInputElement>("#sensitivity")!;
 const senseVal = document.querySelector<HTMLSpanElement>("#sense-val")!;
 const statusEl = document.querySelector<HTMLParagraphElement>("#status")!;
+const akvcamPanel = document.querySelector<HTMLDivElement>("#akvcam-panel");
+const akvcamToggle = document.querySelector<HTMLInputElement>("#akvcam-virtual");
+const akvcamStatusEl = document.querySelector<HTMLParagraphElement>("#akvcam-status");
+const akvcamInstallBtn = document.querySelector<HTMLButtonElement>("#akvcam-install");
+
+/** Raw RGB24 for AkVCamManager stream (width × height × 3). */
+let rgbScratch: Uint8Array | null = null;
+let virtualCamStreaming = false;
 
 let video: HTMLVideoElement | null = null;
 let stream: MediaStream | null = null;
@@ -555,6 +572,7 @@ function scheduleFrameLoop() {
 
     try {
       await processFrame();
+      pushVirtualCamFrame();
       consecutiveErrors = 0;
     } catch {
       consecutiveErrors++;
@@ -603,8 +621,34 @@ function scheduleFrameLoop() {
   }
 }
 
+function pushVirtualCamFrame() {
+  const api = window.akvcam;
+  if (!virtualCamStreaming || !api) return;
+  const w = output.width;
+  const h = output.height;
+  const need = w * h * 3;
+  if (!rgbScratch || rgbScratch.length !== need) {
+    rgbScratch = new Uint8Array(need);
+  }
+  const ctx = output.getContext("2d")!;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 3) {
+    rgbScratch[j] = d[i]!;
+    rgbScratch[j + 1] = d[i + 1]!;
+    rgbScratch[j + 2] = d[i + 2]!;
+  }
+  api.pushFrame(rgbScratch.buffer.slice(0, need) as ArrayBuffer);
+}
+
 function stopCamera() {
   cameraOn = false;
+  virtualCamStreaming = false;
+  if (akvcamToggle) {
+    akvcamToggle.checked = false;
+    akvcamToggle.disabled = true;
+  }
+  void window.akvcam?.stop();
 
   if (video && typeof video.cancelVideoFrameCallback === "function" && vfcHandle) {
     video.cancelVideoFrameCallback(vfcHandle);
@@ -669,6 +713,7 @@ toggleCam.addEventListener("click", async () => {
   placeholder.classList.add("hidden");
   cameraOn = true;
   toggleCam.textContent = "Stop camera";
+  if (akvcamToggle) akvcamToggle.disabled = false;
   setStatus(
     "Running — if your outline is wrong, adjust sensitivity or mirror setting.",
   );
@@ -712,3 +757,56 @@ window.addEventListener("beforeunload", () => {
   stopCamera();
   segmenter?.dispose();
 });
+
+async function initAkvcamUi() {
+  if (!akvcamPanel || !akvcamToggle || !akvcamStatusEl || !akvcamInstallBtn) return;
+  if (!window.akvcam) return;
+  akvcamPanel.classList.remove("hidden");
+  const r = await window.akvcam.resolve();
+  if (r.hasManager) {
+    akvcamStatusEl.textContent =
+      "AKVirtualCamera found. Start the camera, then enable streaming for other apps.";
+  } else if (r.hasInstaller) {
+    akvcamStatusEl.textContent =
+      "Driver/tools not detected. Run the installer (needs admin), then restart this app.";
+  } else {
+    akvcamStatusEl.textContent =
+      "Run npm run akvcam:fetch before building, or install AKVirtualCamera from GitHub.";
+  }
+  akvcamInstallBtn.addEventListener("click", () => {
+    void window.akvcam!.openInstaller();
+  });
+  akvcamToggle.addEventListener("change", async () => {
+    if (!window.akvcam || !cameraOn) {
+      akvcamToggle.checked = false;
+      return;
+    }
+    if (akvcamToggle.checked) {
+      const r2 = await window.akvcam.resolve();
+      if (!r2.hasManager) {
+        setStatus(
+          "Install AKVirtualCamera first (button below), then restart this app.",
+          true,
+        );
+        akvcamToggle.checked = false;
+        return;
+      }
+      const res = await window.akvcam.start({
+        width: output.width,
+        height: output.height,
+        fps: 30,
+      });
+      if (!res.ok) {
+        setStatus(res.error ?? "Could not start virtual camera stream.", true);
+        akvcamToggle.checked = false;
+        return;
+      }
+      virtualCamStreaming = true;
+    } else {
+      virtualCamStreaming = false;
+      await window.akvcam.stop();
+    }
+  });
+}
+
+void initAkvcamUi();

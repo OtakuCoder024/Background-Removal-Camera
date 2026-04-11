@@ -2,6 +2,9 @@ node_modules/
 dist/
 release/
 
+# AKVirtualCamera Windows installer (large; run npm run akvcam:fetch)
+build/akvcam/*.exe
+
 # Logs & env
 *.log
 npm-debug.log*
