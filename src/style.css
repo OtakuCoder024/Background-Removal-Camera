@@ -1,0 +1,381 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1218;
+  --panel: #1a1f2a;
+  --border: #2a3344;
+  --text: #e8ecf2;
+  --muted: #8b95a8;
+  --accent: #5b8cff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+h1 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+}
+
+.sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 1.25rem;
+}
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 840px) {
+  .layout {
+    grid-template-columns: 1fr 280px;
+    align-items: start;
+  }
+}
+
+.preview-wrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--border);
+  aspect-ratio: 16 / 9;
+}
+
+.preview-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.panel h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+label.field span:first-child {
+  color: var(--muted);
+}
+
+.field-hint {
+  font-weight: 400;
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+.file-input {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.file-name {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+input[type="color"] {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+button.primary {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+button.primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.status {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.status.error {
+  color: #f87171;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.meeting-panel {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.meeting-panel summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.meeting-body {
+  margin-top: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.meeting-lead,
+.meeting-tip {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 0.65rem;
+}
+
+.meeting-important {
+  color: var(--text);
+}
+
+.meeting-subhead {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0.75rem 0 0.4rem;
+}
+
+.meeting-bullets {
+  margin: 0 0 0.85rem;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.meeting-bullets li {
+  margin-bottom: 0.45rem;
+}
+
+.meeting-steps {
+  margin: 0 0 0.65rem;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.meeting-steps li {
+  margin-bottom: 0.35rem;
+}
+
+.meeting-steps a {
+  color: var(--accent);
+}
+
+.meeting-code {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.meeting-panel .ghost {
+  margin-top: 0.35rem;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* OBS-friendly: hide chrome and let the preview use the whole window (Window Capture) */
+.preview-obs-toggle {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 5;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(15, 18, 24, 0.82);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.preview-obs-toggle:hover {
+  background: rgba(26, 31, 42, 0.92);
+}
+
+.preview-obs-toggle--exit {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.preview-wrap:hover .preview-obs-toggle--exit,
+.preview-obs-toggle--exit:focus-visible {
+  opacity: 1;
+}
+
+#app.clean-preview {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  max-height: 100vh;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+#app.clean-preview .app-header,
+#app.clean-preview .panel {
+  display: none;
+}
+
+#app.clean-preview .layout {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+#app.clean-preview .preview-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border-width: 0;
+}
+
+/* No letterboxing in OBS mode — scale the frame to cover the window (may crop edges) */
+#app.clean-preview .preview-wrap canvas {
+  object-fit: cover;
+}
+
+body.clean-preview-active {
+  overflow: hidden;
+  height: 100vh;
+  max-height: 100vh;
+}

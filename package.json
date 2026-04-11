@@ -1,0 +1,88 @@
+{
+  "name": "background-removal-camera",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Background Removal Camera — real-time webcam background blur, solid color, or image (browser or Electron for Windows)",
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR_USERNAME/YOUR_REPO.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/YOUR_REPO/issues"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/YOUR_REPO#readme",
+  "keywords": [
+    "webcam",
+    "background-removal",
+    "segmentation",
+    "tensorflow.js",
+    "mediapipe",
+    "electron",
+    "vite",
+    "obs",
+    "virtual-camera"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "desktop:dev": "cross-env ELECTRON_DEV=1 concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "desktop:start": "npm run build && cross-env ELECTRON_DEV=0 electron .",
+    "dist": "npm run build && electron-builder --win",
+    "dist:dir": "npm run build && electron-builder --win --dir"
+  },
+  "dependencies": {
+    "@tensorflow-models/body-segmentation": "^1.0.2",
+    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.backgroundremoval.camera",
+    "productName": "Background Removal Camera",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}
