@@ -109,6 +109,7 @@ let segmenter: bodySegmentation.BodySegmenter | null = null;
 let cameraOn = false;
 let rafId = 0;
 let vfcHandle = 0;
+let hiddenIntervalId = 0;
 
 /** Loaded from the file picker; drawn behind the segmented person. */
 let backgroundImage: HTMLImageElement | null = null;
@@ -462,6 +463,14 @@ async function processFrame() {
   }
 }
 
+/**
+ * Frame loop.
+ *
+ * When the page is visible we use requestVideoFrameCallback / rAF so frames stay
+ * in sync with the display. Both APIs freeze when the window is minimised, so we
+ * fall back to a plain setInterval (~30 fps) while hidden — the segmentation and
+ * canvas output keep running uninterrupted for OBS Window Capture.
+ */
 function scheduleFrameLoop() {
   if (!cameraOn || !video) {
     return;
@@ -469,11 +478,8 @@ function scheduleFrameLoop() {
 
   const v = video;
 
-  const loop = async () => {
-    if (!cameraOn || !v) {
-      return;
-    }
-
+  const runOnce = async () => {
+    if (!cameraOn || !v) return;
     try {
       await processFrame();
     } catch (e) {
@@ -483,30 +489,78 @@ function scheduleFrameLoop() {
         true,
       );
     }
+  };
 
-    if (!cameraOn || !video) {
+  /* ── hidden: drive the loop with setInterval so rAF/rVFC pausing doesn't matter ── */
+  function startHiddenLoop() {
+    stopVisibleLoop();
+    if (hiddenIntervalId) return;
+    hiddenIntervalId = window.setInterval(() => {
+      if (!cameraOn) {
+        stopHiddenLoop();
+        return;
+      }
+      void runOnce();
+    }, 1000 / 30);
+  }
+
+  function stopHiddenLoop() {
+    if (hiddenIntervalId) {
+      clearInterval(hiddenIntervalId);
+      hiddenIntervalId = 0;
+    }
+  }
+
+  /* ── visible: use rVFC or rAF for display-sync rendering ── */
+  function stopVisibleLoop() {
+    if (v.cancelVideoFrameCallback && vfcHandle) {
+      v.cancelVideoFrameCallback(vfcHandle);
+      vfcHandle = 0;
+    }
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  const visibleLoop = async () => {
+    if (!cameraOn || !v) return;
+    await runOnce();
+    if (!cameraOn || !video) return;
+    if (document.hidden) {
+      /* page became hidden mid-frame: hand off to interval */
+      startHiddenLoop();
       return;
     }
-
     if (typeof v.requestVideoFrameCallback === "function") {
-      vfcHandle = v.requestVideoFrameCallback(() => {
-        void loop();
-      });
+      vfcHandle = v.requestVideoFrameCallback(() => void visibleLoop());
     } else {
-      rafId = requestAnimationFrame(() => {
-        void loop();
-      });
+      rafId = requestAnimationFrame(() => void visibleLoop());
     }
   };
 
-  if (typeof v.requestVideoFrameCallback === "function") {
-    vfcHandle = v.requestVideoFrameCallback(() => {
-      void loop();
-    });
+  /* ── react to minimise / restore ── */
+  const onVisibilityChange = () => {
+    if (!cameraOn) return;
+    if (document.hidden) {
+      stopVisibleLoop();
+      startHiddenLoop();
+    } else {
+      stopHiddenLoop();
+      void visibleLoop();
+    }
+  };
+
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  /* ── kick off ── */
+  if (document.hidden) {
+    startHiddenLoop();
+  } else if (typeof v.requestVideoFrameCallback === "function") {
+    vfcHandle = v.requestVideoFrameCallback(() => void visibleLoop());
   } else {
-    rafId = requestAnimationFrame(() => {
-      void loop();
-    });
+    rafId = requestAnimationFrame(() => void visibleLoop());
   }
 }
 
@@ -519,6 +573,10 @@ function stopCamera() {
   }
   cancelAnimationFrame(rafId);
   rafId = 0;
+  if (hiddenIntervalId) {
+    clearInterval(hiddenIntervalId);
+    hiddenIntervalId = 0;
+  }
 
   if (stream) {
     for (const t of stream.getTracks()) {

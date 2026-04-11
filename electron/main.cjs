@@ -69,6 +69,10 @@ function createWindow() {
 
       sandbox: false,
 
+      /** Keep JS timers running when the window is minimised / hidden.
+       *  Without this, rAF and setInterval freeze and the segmentation loop stops. */
+      backgroundThrottling: false,
+
     },
 
   });
