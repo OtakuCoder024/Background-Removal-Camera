@@ -1,10 +1,15 @@
 /**
- * Builds build/icon.ico from build/icon.png for electron-builder (Windows .exe / NSIS / taskbar).
+ * Generates all icon assets from icon1.png (552×552 pre-cropped square source).
  *
- * 1) Center-crop with ICON_CROP_RATIO (default 0.62) so the artwork fills the icon — source art
- *    often has padding that makes the glyph look tiny at 16–256px.
- * 2) Lanczos resize for sharp multi-size layers.
- * 3) Writes public/icon.png at 512×512 so the browser favicon scales up cleanly.
+ * icon1.png is ALREADY tight — the figure fills the frame with no transparent padding.
+ * We resize it DIRECTLY to each target size (no center-crop needed).
+ *
+ * Outputs:
+ *   build/icon.png            — copy of source
+ *   build/icon.ico            — multi-size ICO for .exe / NSIS / taskbar
+ *   electron/icon.ico         — same, dev fallback
+ *   electron/window-icon.png  — 256×256 PNG for BrowserWindow title bar
+ *   public/icon.png           — 512×512 favicon
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -13,65 +18,79 @@ const sharp = require("sharp");
 const toIco = require("to-ico");
 
 const root = path.join(__dirname, "..");
-const pngPath = path.join(root, "build", "icon.png");
+const srcPath = (() => {
+  const p1 = path.join(root, "icon1.png");
+  if (fs.existsSync(p1)) return p1;
+  const p2 = path.join(root, "build", "icon.png");
+  if (fs.existsSync(p2)) return p2;
+  return null;
+})();
+
+const buildPngPath = path.join(root, "build", "icon.png");
 const icoPath = path.join(root, "build", "icon.ico");
 const publicPng = path.join(root, "public", "icon.png");
+const electronWindowPng = path.join(root, "electron", "window-icon.png");
+const electronIcoPath = path.join(root, "electron", "icon.ico");
 
-/** Fraction of min(width,height) kept from the center. Lower = tighter crop = larger-looking subject. */
-const CROP_RATIO = Math.min(
-  0.95,
-  Math.max(0.35, Number(process.env.ICON_CROP_RATIO || 0.62)),
-);
+/** Crop factor: 0.65 = keep center 65% of the frame → figure fills the icon prominently. */
+const CROP_RATIO = Math.min(0.95, Math.max(0.35, Number(process.env.ICON_CROP_RATIO || 0.65)));
 
-async function centerCropSquare(inputBuffer) {
-  const meta = await sharp(inputBuffer).metadata();
-  const w = meta.width ?? 0;
-  const h = meta.height ?? 0;
-  if (!w || !h) {
-    throw new Error("Could not read image dimensions");
-  }
-  const side = Math.min(w, h);
-  const cropSize = Math.max(1, Math.round(side * CROP_RATIO));
-  const left = Math.floor((w - cropSize) / 2);
-  const top = Math.floor((h - cropSize) / 2);
-  return sharp(inputBuffer)
+async function cropAndResize(buffer, size, alpha = false) {
+  const meta = await sharp(buffer).metadata();
+  const side = Math.min(meta.width ?? 0, meta.height ?? 0);
+  const cropSize = Math.round(side * CROP_RATIO);
+  const left = Math.floor(((meta.width ?? 0) - cropSize) / 2);
+  const top  = Math.floor(((meta.height ?? 0) - cropSize) / 2);
+
+  let s = sharp(buffer)
     .extract({ left, top, width: cropSize, height: cropSize })
-    .ensureAlpha()
-    .png()
-    .toBuffer();
+    .resize(size, size, { fit: "fill", kernel: sharp.kernel.lanczos3 });
+  if (!alpha) {
+    s = s.flatten({ background: "#0f1218" }).removeAlpha();
+  }
+  const buf = await s.png().toBuffer();
+  const m = await sharp(buf).metadata();
+  if (m.width !== size || m.height !== size) {
+    throw new Error(`cropAndResize(${size}): got ${m.width}×${m.height}`);
+  }
+  return buf;
 }
 
 async function main() {
-  if (!fs.existsSync(pngPath)) {
-    console.error("Missing", pngPath);
+  if (!srcPath) {
+    console.error("Missing source: add icon1.png to the project root");
     process.exit(1);
   }
-  const raw = fs.readFileSync(pngPath);
-  const cropped = await centerCropSquare(raw);
-  console.log("Center crop ratio", CROP_RATIO, "(set ICON_CROP_RATIO to tweak)");
 
-  const sizes = [16, 24, 32, 48, 64, 96, 128, 256];
-  const buffers = await Promise.all(
-    sizes.map((w) =>
-      sharp(cropped)
-        .resize(w, w, { kernel: sharp.kernel.lanczos3 })
-        .png()
-        .toBuffer(),
-    ),
-  );
-  const ico = await toIco(buffers);
-  fs.writeFileSync(icoPath, ico);
-  const electronIco = path.join(root, "electron", "icon.ico");
-  fs.copyFileSync(icoPath, electronIco);
-  console.log("Wrote", icoPath, `(${ico.length} bytes)`);
-  console.log("Copied to", electronIco);
-
+  fs.mkdirSync(path.join(root, "build"), { recursive: true });
+  fs.mkdirSync(path.join(root, "electron"), { recursive: true });
   fs.mkdirSync(path.dirname(publicPng), { recursive: true });
-  await sharp(cropped)
-    .resize(512, 512, { kernel: sharp.kernel.lanczos3 })
-    .png()
-    .toFile(publicPng);
-  console.log("Wrote", publicPng, "(512×512 favicon)");
+
+  const raw = fs.readFileSync(srcPath);
+  const meta = await sharp(raw).metadata();
+  console.log(`Source: ${path.relative(root, srcPath)} (${meta.width}×${meta.height})`);
+
+  fs.copyFileSync(srcPath, buildPngPath);
+
+  console.log(`Crop ratio: ${CROP_RATIO} (cropSize = ${Math.round((meta.width ?? 552) * CROP_RATIO)}px from ${meta.width}px source)`);
+
+  // ── Window / title-bar icon (BrowserWindow) ───────────────────────────────
+  const winBuf = await cropAndResize(raw, 256, false);
+  fs.writeFileSync(electronWindowPng, winBuf);
+  console.log(`electron/window-icon.png: 256×256 ✓`);
+
+  // ── ICO: .exe / installer / taskbar ──────────────────────────────────────
+  const icoSizes = [16, 24, 32, 48, 64, 96, 128, 256];
+  const icoBuffers = await Promise.all(icoSizes.map((w) => cropAndResize(raw, w, false)));
+  const ico = await toIco(icoBuffers);
+  fs.writeFileSync(icoPath, ico);
+  fs.copyFileSync(icoPath, electronIcoPath);
+  console.log(`build/icon.ico: ${ico.length} bytes, layers: ${icoSizes.join(", ")} ✓`);
+
+  // ── Favicon ───────────────────────────────────────────────────────────────
+  const faviconBuf = await cropAndResize(raw, 512, true);
+  fs.writeFileSync(publicPng, faviconBuf);
+  console.log(`public/icon.png: 512×512 ✓`);
 }
 
 main().catch((err) => {

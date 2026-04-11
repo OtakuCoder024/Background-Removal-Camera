@@ -72,6 +72,10 @@
       {
         "from": "build/icon.ico",
         "to": "app-icon.ico"
+      },
+      {
+        "from": "electron/window-icon.png",
+        "to": "window-icon.png"
       }
     ],
     "win": {

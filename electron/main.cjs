@@ -3,18 +3,22 @@ const path = require("node:path");
 
 const { pathToFileURL } = require("node:url");
 
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, nativeImage } = require("electron");
 
-/** Packaged builds read icon from extraResources; dev uses electron/icon.ico (run `npm run icons`). */
-function windowIconPath() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "app-icon.ico");
+/**
+ * Load window-icon.png as a buffer and create the nativeImage with explicit size.
+ * This avoids Windows misreading ICO layer dimensions and skewing the title-bar icon.
+ */
+function getWindowIcon() {
+  const pngPath = app.isPackaged
+    ? path.join(process.resourcesPath, "window-icon.png")
+    : path.join(__dirname, "window-icon.png");
+  if (fs.existsSync(pngPath)) {
+    const buf = fs.readFileSync(pngPath);
+    const img = nativeImage.createFromBuffer(buf, { width: 256, height: 256 });
+    if (!img.isEmpty()) return img;
   }
-  const ico = path.join(__dirname, "icon.ico");
-  if (fs.existsSync(ico)) {
-    return ico;
-  }
-  return path.join(__dirname, "icon.png");
+  return undefined;
 }
 
 
@@ -47,7 +51,7 @@ function createWindow() {
 
     backgroundColor: "#0f1218",
 
-    icon: windowIconPath(),
+    icon: getWindowIcon(),
 
     show: false,
 
