@@ -34,6 +34,8 @@ function createWindow() {
 
     backgroundColor: "#0f1218",
 
+    icon: path.join(__dirname, "icon.png"),
+
     show: false,
 
     autoHideMenuBar: true,

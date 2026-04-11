@@ -56,8 +56,10 @@
     "appId": "com.backgroundremoval.camera",
     "productName": "Background Removal Camera",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
+    "icon": "build/icon.png",
     "files": [
       "dist/**/*",
       "electron/**/*",
