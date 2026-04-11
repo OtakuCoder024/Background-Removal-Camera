@@ -20,12 +20,12 @@ function getWindowIcon() {
 }
 
 function getTrayIcon() {
-  const icoPath = app.isPackaged
-    ? path.join(process.resourcesPath, "app-icon.ico")
-    : path.join(__dirname, "icon.ico");
-  if (fs.existsSync(icoPath)) {
-    const img = nativeImage.createFromPath(icoPath);
-    if (!img.isEmpty()) return img;
+  const pngPath = app.isPackaged
+    ? path.join(process.resourcesPath, "tray-icon.png")
+    : path.join(__dirname, "..", "build", "icon.png");
+  if (fs.existsSync(pngPath)) {
+    const img = nativeImage.createFromPath(pngPath);
+    if (!img.isEmpty()) return img.resize({ width: 16, height: 16 });
   }
   const win = getWindowIcon();
   return win ? win.resize({ width: 16, height: 16 }) : nativeImage.createEmpty();

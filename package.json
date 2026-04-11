@@ -36,7 +36,7 @@
     "desktop:dev": "cross-env ELECTRON_DEV=1 concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "desktop:start": "npm run build && npm run icons && cross-env ELECTRON_DEV=0 electron .",
     "icons": "node scripts/generate-windows-icon.cjs",
-    "dist": "npm run build && npm run icons && electron-builder --win",
+    "dist": "npm run build && npm run icons && electron-builder --win && node scripts/patch-icons.cjs",
     "dist:dir": "npm run build && npm run icons && electron-builder --win --dir"
   },
   "dependencies": {
@@ -49,8 +49,8 @@
     "cross-env": "^7.0.3",
     "electron": "^34.0.0",
     "electron-builder": "^25.1.8",
+    "rcedit": "^5.0.2",
     "sharp": "^0.34.5",
-    "to-ico": "^1.1.5",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "wait-on": "^8.0.1"
@@ -70,8 +70,8 @@
     ],
     "extraResources": [
       {
-        "from": "build/icon.ico",
-        "to": "app-icon.ico"
+        "from": "build/icon.png",
+        "to": "tray-icon.png"
       },
       {
         "from": "electron/window-icon.png",
@@ -97,10 +97,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico"
+      "createDesktopShortcut": true
     }
   }
 }
