@@ -34,9 +34,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "desktop:dev": "cross-env ELECTRON_DEV=1 concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "desktop:start": "npm run build && cross-env ELECTRON_DEV=0 electron .",
-    "dist": "npm run build && electron-builder --win",
-    "dist:dir": "npm run build && electron-builder --win --dir"
+    "desktop:start": "npm run build && npm run icons && cross-env ELECTRON_DEV=0 electron .",
+    "icons": "node scripts/generate-windows-icon.cjs",
+    "dist": "npm run build && npm run icons && electron-builder --win",
+    "dist:dir": "npm run build && npm run icons && electron-builder --win --dir"
   },
   "dependencies": {
     "@tensorflow-models/body-segmentation": "^1.0.2",
@@ -48,6 +49,8 @@
     "cross-env": "^7.0.3",
     "electron": "^34.0.0",
     "electron-builder": "^25.1.8",
+    "sharp": "^0.34.5",
+    "to-ico": "^1.1.5",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "wait-on": "^8.0.1"
@@ -59,11 +62,17 @@
       "output": "release",
       "buildResources": "build"
     },
-    "icon": "build/icon.png",
+    "icon": "build/icon.ico",
     "files": [
       "dist/**/*",
       "electron/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "app-icon.ico"
+      }
     ],
     "win": {
       "target": [
@@ -84,7 +93,10 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     }
   }
 }

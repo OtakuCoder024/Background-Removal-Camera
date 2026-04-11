@@ -1,8 +1,21 @@
+const fs = require("node:fs");
 const path = require("node:path");
 
 const { pathToFileURL } = require("node:url");
 
 const { app, BrowserWindow } = require("electron");
+
+/** Packaged builds read icon from extraResources; dev uses electron/icon.ico (run `npm run icons`). */
+function windowIconPath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "app-icon.ico");
+  }
+  const ico = path.join(__dirname, "icon.ico");
+  if (fs.existsSync(ico)) {
+    return ico;
+  }
+  return path.join(__dirname, "icon.png");
+}
 
 
 
@@ -34,7 +47,7 @@ function createWindow() {
 
     backgroundColor: "#0f1218",
 
-    icon: path.join(__dirname, "icon.png"),
+    icon: windowIconPath(),
 
     show: false,
 
