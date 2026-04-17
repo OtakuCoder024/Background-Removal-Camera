@@ -24,6 +24,8 @@ export interface AkvcamApi {
   stop: () => Promise<{ ok: boolean }>;
   openInstaller: () => Promise<{ ok: boolean; reason?: string }>;
   pushFrame: (arrayBuffer: ArrayBuffer) => void;
+  /** Unsubscribe when done (e.g. hot reload) */
+  onStreamError: (handler: (message: string) => void) => () => void;
 }
 
 declare global {

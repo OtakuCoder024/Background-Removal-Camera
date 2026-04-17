@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
-const { ipcMain, app, shell } = require("electron");
+const { ipcMain, app, shell, BrowserWindow } = require("electron");
 
 const AKVCAM_VERSION = "9.4.0";
 const INSTALLER_NAME = `akvirtualcamera-windows-${AKVCAM_VERSION}.exe`;
@@ -64,15 +64,66 @@ function resolveInstallerPath() {
   return fs.existsSync(p) ? p : null;
 }
 
+function broadcastAkvcamStreamError(message) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      win.webContents.send("akvcam:stream-error", message);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * AkVCamManager exited or the pipe broke while streaming; clear state once.
+ * @param {import('child_process').ChildProcess} proc
+ * @param {Error} [err]
+ * @param {string} [fallbackMessage]
+ */
+function notifyStreamUnexpectedEnd(proc, err, fallbackMessage) {
+  if (proc.akvcamNotified) return;
+  proc.akvcamNotified = true;
+  if (streamProc === proc) streamProc = null;
+  akvcamStdinOk = true;
+  try {
+    proc.stdin?.removeAllListeners();
+  } catch {
+    /* ignore */
+  }
+  if (!pendingStop) {
+    const msg =
+      err?.message ||
+      fallbackMessage ||
+      "Virtual camera stream stopped unexpectedly.";
+    broadcastAkvcamStreamError(msg);
+  }
+  try {
+    if (!proc.killed) proc.kill();
+  } catch {
+    /* ignore */
+  }
+}
+
 function stopStreamProcess() {
   pendingStop = true;
   if (streamProc) {
+    const proc = streamProc;
+    proc.akvcamNotified = true;
     try {
-      streamProc.stdin.end();
-    } catch { /* ignore */ }
+      streamProc.stdin?.removeAllListeners();
+    } catch {
+      /* ignore */
+    }
+    try {
+      streamProc.stdin?.end();
+    } catch {
+      /* ignore */
+    }
     try {
       streamProc.kill();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     streamProc = null;
   }
   akvcamStdinOk = true;
@@ -136,18 +187,27 @@ function registerAkvcamIpc() {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
 
-    streamProc.stderr?.on("data", (chunk) => {
+    const proc = streamProc;
+    proc.akvcamNotified = false;
+
+    proc.stderr?.on("data", (chunk) => {
       console.error("[akvcam]", chunk.toString());
     });
-    streamProc.on("error", (err) => {
+    proc.on("error", (err) => {
       console.error("[akvcam] process error", err);
     });
-    streamProc.on("close", (code) => {
-      if (!pendingStop) {
-        console.warn("[akvcam] stream exited", code);
-      }
-      streamProc = null;
-      akvcamStdinOk = true;
+    proc.stdin.on("error", (err) => {
+      console.error("[akvcam] stdin error", err);
+      notifyStreamUnexpectedEnd(proc, err);
+    });
+    proc.on("close", (code) => {
+      if (proc.akvcamNotified) return;
+      console.warn("[akvcam] stream exited", code);
+      notifyStreamUnexpectedEnd(
+        proc,
+        undefined,
+        `AkVCamManager exited (code ${code ?? "?"})`,
+      );
     });
 
     return { ok: true };
@@ -159,15 +219,28 @@ function registerAkvcamIpc() {
   });
 
   ipcMain.on("akvcam-frame", (_event, payload) => {
-    if (!streamProc?.stdin?.writable || pendingStop) return;
+    const proc = streamProc;
+    if (!proc?.stdin?.writable || pendingStop || proc.akvcamNotified) return;
     if (!akvcamStdinOk) return;
     const buf = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
-    akvcamStdinOk = streamProc.stdin.write(buf, (err) => {
-      if (err) console.error("[akvcam] stdin write error", err);
-    });
+    try {
+      akvcamStdinOk = proc.stdin.write(buf, (err) => {
+        if (err) {
+          console.error("[akvcam] write callback error", err);
+          notifyStreamUnexpectedEnd(proc, err);
+        }
+      });
+    } catch (err) {
+      console.error("[akvcam] write threw", err);
+      notifyStreamUnexpectedEnd(
+        proc,
+        err instanceof Error ? err : new Error(String(err)),
+      );
+      return;
+    }
     if (!akvcamStdinOk) {
-      streamProc.stdin.once("drain", () => {
-        akvcamStdinOk = true;
+      proc.stdin.once("drain", () => {
+        if (streamProc === proc && !proc.akvcamNotified) akvcamStdinOk = true;
       });
     }
   });

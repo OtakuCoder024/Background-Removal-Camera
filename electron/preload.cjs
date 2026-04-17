@@ -10,5 +10,15 @@ if (process.platform === "win32") {
     pushFrame: (arrayBuffer) => {
       ipcRenderer.send("akvcam-frame", arrayBuffer);
     },
+    /** Called when the pipe breaks or AkVCamManager exits; returns unsubscribe */
+    onStreamError: (handler) => {
+      const listener = (_event, msg) => {
+        handler(String(msg ?? ""));
+      };
+      ipcRenderer.on("akvcam:stream-error", listener);
+      return () => {
+        ipcRenderer.removeListener("akvcam:stream-error", listener);
+      };
+    },
   });
 }

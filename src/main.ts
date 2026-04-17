@@ -119,6 +119,7 @@ const akvcamInstallBtn = document.querySelector<HTMLButtonElement>("#akvcam-inst
 /** Raw RGB24 for AkVCamManager stream (width × height × 3). */
 let rgbScratch: Uint8Array | null = null;
 let virtualCamStreaming = false;
+let akvcamUnsubStreamError: (() => void) | undefined;
 
 let video: HTMLVideoElement | null = null;
 let stream: MediaStream | null = null;
@@ -754,6 +755,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("beforeunload", () => {
+  akvcamUnsubStreamError?.();
+  akvcamUnsubStreamError = undefined;
   stopCamera();
   segmenter?.dispose();
 });
@@ -775,6 +778,12 @@ async function initAkvcamUi() {
   }
   akvcamInstallBtn.addEventListener("click", () => {
     void window.akvcam!.openInstaller();
+  });
+  akvcamUnsubStreamError = window.akvcam.onStreamError((msg) => {
+    virtualCamStreaming = false;
+    if (akvcamToggle) akvcamToggle.checked = false;
+    akvcamStatusEl.textContent = `Stream stopped (${msg}). Uncheck and enable again to retry.`;
+    setStatus(`Virtual camera: ${msg}`, true);
   });
   akvcamToggle.addEventListener("change", async () => {
     if (!window.akvcam || !cameraOn) {

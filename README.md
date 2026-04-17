@@ -44,7 +44,9 @@ The desktop app can stream the **processed** picture to **AKVirtualCamera** so Z
 2. In the app: **Start camera**, then enable **Stream processed output to AKVirtualCamera**.
 3. In the other app, choose the virtual camera device (often named like **Virtual Camera**).
 
-**Building from source:** `npm run akvcam:fetch` downloads the pinned installer into `build/akvcam/` (required before `npm run dist` if the file is not already there).
+**Building from source:** `npm run akvcam:fetch` downloads the pinned installer into `build/akvcam/` (required before `npm run dist` if the file is not already there). The script checks the file size and SHA256 from GitHub so bad downloads are not kept.
+
+**If the installer shows an NSIS error (“Installer integrity check has failed”):** the file is corrupt or incomplete. Delete `build/akvcam/akvirtualcamera-windows-9.4.0.exe` and run `npm run akvcam:fetch` again, or download the same asset manually from the [9.4.0 release](https://github.com/webcamoid/akvirtualcamera/releases/tag/9.4.0) (the Windows `.exe` should be about **3.5 MB**).
 
 ---
 
